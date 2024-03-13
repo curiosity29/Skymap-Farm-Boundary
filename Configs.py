@@ -41,11 +41,14 @@ def U2Net_get_configs(version = 1, n_channel = 3):
 
 def model_get_args():
   return dict(
-    input_size = 512,
-    n_channel = 4,
-    n_class = 4,
+    input_size = 448,
+    n_channel = 3,
+    n_class = 3,
   )
 
-def preprocess_get_bound():
-  lows, highs = np.array([ 54., 133.,  48.,  56.]), np.array([ 564., 1120., 1512., 4259.])
-  return lows, highs
+
+def get_refine_args():
+  """ 
+    not implemented
+  """
+  return
