@@ -4,9 +4,8 @@ from functools import partial
 import os, sys, glob
 
 from Utils.Window import predict_windows
-from Utils import Preprocess
 from Utils.Vectorize import vectorize
-from Utils.Postprocess import predict_adapter_boundary, predict_adapter_farm, filter_polygons, simplify_polygons, refine_polygons, to_binary_mask
+from Utils.Postprocess import farm_predict_adapter, boundary_predict_adapter, filter_polygons, simplify_polygons, refine_polygons, to_binary_mask
 from Model import U2Net
 import Configs
 import tensorflow as tf
@@ -14,8 +13,8 @@ import tensorflow as tf
 def get_main_args():
     parser = ArgumentParser(formatter_class=ArgumentDefaultsHelpFormatter)
     arg = parser.add_argument
-    arg("--weight_path_boundary", type=str, default="./Checkpoint/*.h5", help="checkpoint file to create boundary mask")
-    arg("--weight_path_farm", type=str, default="./Checkpoint_weights/*.h5", help="checkpoint file to create farm mask")
+    arg("--weight_path_boundary", type=str, default="./Checkpoints/*.h5", help="checkpoint file to create boundary mask")
+    arg("--weight_path_farm", type=str, default="./Checkpoints/*.h5", help="checkpoint file to create farm mask")
 
     arg("--image_path", type=str, default="./Images/*.tif", help="4 channel input tif file")
     arg("--save_path_folder", type=str, default="./Predictions/", help="folder to save prediction and other processing file")
@@ -29,16 +28,18 @@ def get_main_args():
 
 def predict(image_path = "./image.tif", save_path_folder = "./Predictions", 
             weight_path_boundary = "./Checkpoint_weights/*.weights.h5", weight_path_farm = "./Checkpoint_weights/*.weights.h5",
-            batch_size = 1, simplify_distance = 1., boundary_threshold = 0.5, farm_threshold = 0.5,
+            batch_size = 1, simplify_distance = 1., boundary_threshold = 0.5, farm_threshold = 0.5, sharp_angle = 30,
             search_path = True):
 
-    # if search_path:
-    #     try:
-    #         weight_path = glob.glob(f"{weight_path}", recursive=True)[0]
-    #         image_path = glob.glob(f"{image_path}", recursive=True)[0]
-    #     except:
-    #         print("image or weight not found")
-    #         return
+    if search_path:
+        try:
+            weight_path_boundary = glob.glob(f"{weight_path_boundary}", recursive=True)[0]
+            weight_path_farm = glob.glob(f"{weight_path_farm}", recursive=True)[0]
+    
+            image_path = glob.glob(f"{image_path}", recursive=True)[0]
+        except:
+            print("image or weight not found")
+            return
 
     ### get boundary mask
     preprocess = lambda x: x/255
@@ -46,7 +47,7 @@ def predict(image_path = "./image.tif", save_path_folder = "./Predictions",
     predict_dim = 1
 
     boundary_model = tf.keras.models.load_model(weight_path_boundary)
-    predictor = partial(predict_adapter_boundary, model = boundary_model)
+    predictor = partial(boundary_predict_adapter, model = boundary_model)
 
     boundary_mask_path = os.path.join(save_path_folder, "raw_boundary.tif")
     predict_windows(pathTif = image_path, pathSave = boundary_mask_path, predictor = predictor, preprocess = preprocess,
@@ -59,7 +60,7 @@ def predict(image_path = "./image.tif", save_path_folder = "./Predictions",
     args = Configs.model_get_args()
     farm_model = U2Net(**args)
     farm_model.load_weights(weight_path_farm)
-    predictor = partial(predict_adapter_farm, model = farm_model)
+    predictor = partial(farm_predict_adapter, model = farm_model)
 
     farm_mask_path = os.path.join(save_path_folder, "raw_farm.tif")
     predict_windows(pathTif = image_path, pathSave = farm_mask_path, predictor = predictor, preprocess = preprocess,
