@@ -1,6 +1,5 @@
 import numpy as np
-import cv2
-from scipy.stats import multivariate_normal
+
 import tensorflow as tf
 import shapely.geometry as geometry
 from shapely import Polygon
