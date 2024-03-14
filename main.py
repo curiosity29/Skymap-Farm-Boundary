@@ -5,7 +5,7 @@ import os, sys, glob
 
 from Utils.Window import predict_windows
 from Utils import Preprocess
-from Utils.Rasterize import rasterize
+from Utils.Vectorize import vectorize
 from Utils.Postprocess import predict_adapter_boundary, predict_adapter_farm, filter_polygons, simplify_polygons, refine_polygons, to_binary_mask
 from Model import U2Net
 import Configs
@@ -14,7 +14,7 @@ import tensorflow as tf
 def get_main_args():
     parser = ArgumentParser(formatter_class=ArgumentDefaultsHelpFormatter)
     arg = parser.add_argument
-    arg("--weight_path_boundary", type=str, default="./Checkpoint_weights/*.h5", help="checkpoint file to create boundary mask")
+    arg("--weight_path_boundary", type=str, default="./Checkpoint/*.h5", help="checkpoint file to create boundary mask")
     arg("--weight_path_farm", type=str, default="./Checkpoint_weights/*.h5", help="checkpoint file to create farm mask")
 
     arg("--image_path", type=str, default="./Images/*.tif", help="4 channel input tif file")
@@ -29,7 +29,7 @@ def get_main_args():
 
 def predict(image_path = "./image.tif", save_path_folder = "./Predictions", 
             weight_path_boundary = "./Checkpoint_weights/*.weights.h5", weight_path_farm = "./Checkpoint_weights/*.weights.h5",
-            batch_size = 4, simplify_distance = 1., boundary_threshold = 0.5, farm_threshold = 0.5,
+            batch_size = 1, simplify_distance = 1., boundary_threshold = 0.5, farm_threshold = 0.5,
             search_path = True):
 
     # if search_path:
@@ -70,7 +70,7 @@ def predict(image_path = "./image.tif", save_path_folder = "./Predictions",
     to_binary_mask(path_in = boundary_mask_path, path_out=boundary_binary_mask_path, threshold=boundary_threshold)
 
     boundary_shape_path =  os.path.join(save_path_folder, "shape_boundary.shp")
-    rasterize(path_in = boundary_binary_mask_path, path_out = boundary_shape_path)
+    vectorize(path_in = boundary_binary_mask_path, path_out = boundary_shape_path)
     
     gdf = filter_polygons(boundary_shape_path, farm_mask_path)
     gdf = simplify_polygons(gdf)
