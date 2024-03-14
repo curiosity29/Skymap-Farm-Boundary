@@ -6,16 +6,34 @@ import shapely.geometry as geometry
 from shapely import Polygon
 from rasterstats import zonal_stats
 import geopandas as gd
+import rasterio as rs
    
-def predict_adapter(batch, model, strength):
+def farm_predict_adapter(batch, model):
   ## dilated predict
-  predict = model.predict(tf.concat([batch,batch], axis = -1), verbose = 0)[:, 1, ...]
-
-  predict = np.array([amplify(predict_, strength = strength) for predict_ in predict])
-  predict = np.argmax(predict, axis = -1)
-  predict = predict[..., np.newaxis]
+  batch= batch[..., :3] # take the first 3 band
+  pred = model.predict(batch, verbose = 0)
+  pred = np.array(pred)
+  # print(pred.shape)
+  pred = pred[:, 0, ..., 2:3] # take prediction of farm class
+  return pred
 
   return predict
+
+def boundary_predict_adapter(batch, model):
+  batch= batch[..., :3] # take the first 3 band
+  pred = model.predict(batch, verbose = 0)
+  pred = np.array(pred)
+  pred = pred[0, :, ...]
+  return pred
+
+
+def to_binary_mask(path_in, path_out, threshold = 0.5):
+  with rs.open(path_in) as src:
+    out_meta = src.meta
+    bin_mask = src.read()
+    bin_mask = np.where(bin_mask > threshold, 1., 0.)
+  with rs.open(path_out, "w", **out_meta) as dest:
+    dest.write(bin_mask)
 
 ## simplify polygon:
 def filter_polygons(pathShape, pathMask):

@@ -6,7 +6,7 @@ import os, sys, glob
 from Utils.Window import predict_windows
 from Utils import Preprocess
 from Utils.Rasterize import rasterize
-from Utils.Postprocess import predict_adapter_boundary, predict_adapter_farm, filter_polygons, simplify_polygons, refine_polygons
+from Utils.Postprocess import predict_adapter_boundary, predict_adapter_farm, filter_polygons, simplify_polygons, refine_polygons, to_binary_mask
 from Model import U2Net
 import Configs
 import tensorflow as tf
@@ -65,9 +65,12 @@ def predict(image_path = "./image.tif", save_path_folder = "./Predictions",
     predict_windows(pathTif = image_path, pathSave = farm_mask_path, predictor = predictor, preprocess = preprocess,
                     window_size = 512, input_dim = input_dim, predict_dim = predict_dim,
                     output_type = "float32", batch_size = batch_size)
+    
+    boundary_binary_mask_path = os.path.join(save_path_folder, "binary_boundary.tif")
+    to_binary_mask(path_in = boundary_mask_path, path_out=boundary_binary_mask_path, threshold=boundary_threshold)
 
     boundary_shape_path =  os.path.join(save_path_folder, "shape_boundary.shp")
-    rasterize(path_in = boundary_mask_path, path_out = boundary_shape_path)
+    rasterize(path_in = boundary_binary_mask_path, path_out = boundary_shape_path)
     
     gdf = filter_polygons(boundary_shape_path, farm_mask_path)
     gdf = simplify_polygons(gdf)
