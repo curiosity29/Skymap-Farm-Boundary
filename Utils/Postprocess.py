@@ -6,6 +6,9 @@ from shapely import Polygon
 from rasterstats import zonal_stats
 import geopandas as gd
 import rasterio as rs
+import cv2
+from skimage.morphology import skeletonize #, remove_small_holes, remove_small_objects
+from Window import predict_windows
    
 def farm_predict_adapter(batch, model):
   ## dilated predict
@@ -198,7 +201,7 @@ def refine_polygons(gdf, save_path = None):
   row_remove_list = []
   for idx, row in gdf.iterrows():
 
-    eps = 0.1
+    # eps = 0.1
     geom = row["geometry"]
 
     if geom.geom_type == "MultiPolygon":
@@ -206,20 +209,18 @@ def refine_polygons(gdf, save_path = None):
       geoms = list(geom.geoms)
       polygons = []
       for geom in geoms:
-        if geom.area < eps:
-            row_remove_list.append(idx)
-            continue
+        # if geom.area < eps:
+        #     row_remove_list.append(idx)
+        #     continue
         polygons.append(refine_polygon(geom))
       polygon = geometry.MultiPolygon(polygons)
 
 
     else:
-      ###
-      # continue
-      ###
-      if geom.area < eps:
-        row_remove_list.append(idx)
-        continue
+
+      # if geom.area < eps:
+      #   row_remove_list.append(idx)
+      #   continue
 
       polygon = refine_polygon(geom)
 
@@ -234,3 +235,27 @@ def refine_polygons(gdf, save_path = None):
 
   else:
     refined_gdf.to_file(save_path)
+
+
+def trim_paths(mask, padding = 20):
+  padding = 20
+  skeleton = skeletonize(mask)
+  trimmed = skeleton[padding:-padding, padding:-padding, 0]
+  trimmed = np.pad(trimmed, padding, mode='constant', constant_values=1)
+  for _ in range(100):
+    trimmed = cv2.filter2D(trimmed.astype(np.uint8), -1, kernel = np.ones((3,3))) * trimmed
+    trimmed = np.where(trimmed < 3, 0, 1)
+    # print(trimmed.shape)
+    # np.unique(skeleton_type)
+
+  mask[padding:-padding, padding:-padding] = trimmed
+
+  return mask
+
+def trim_paths_window(path_in, path_out):
+  predictor = lambda batch: np.array([trim_paths(x, padding = 20) for x in batch])
+  preprocess = lambda x: x
+  
+  predict_windows(pathTif = path_in, pathSave = path_out, predictor = predictor, preprocess = preprocess,
+                window_size = 480, input_dim = 1, predict_dim = 1,
+                output_type = "uint8", batch_size = 4)

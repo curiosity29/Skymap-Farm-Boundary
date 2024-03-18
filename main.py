@@ -5,10 +5,12 @@ import os, sys, glob
 
 from Utils.Window import predict_windows
 from Utils.Vectorize import vectorize
-from Utils.Postprocess import farm_predict_adapter, boundary_predict_adapter, filter_polygons, simplify_polygons, refine_polygons, to_binary_mask
+from Utils.Postprocess import farm_predict_adapter, boundary_predict_adapter, \
+    filter_polygons, simplify_polygons, refine_polygons, to_binary_mask, trim_paths_window
 from Model import U2Net
 import Configs
 import tensorflow as tf
+import geopandas as gd
 
 def get_main_args():
     parser = ArgumentParser(formatter_class=ArgumentDefaultsHelpFormatter)
@@ -41,6 +43,7 @@ def predict(image_path = "./image.tif", save_path_folder = "./Predictions",
             print("image or weight not found")
             return
 
+
     ### get boundary mask
     preprocess = lambda x: x/255
     input_dim = 3
@@ -49,35 +52,53 @@ def predict(image_path = "./image.tif", save_path_folder = "./Predictions",
     boundary_model = tf.keras.models.load_model(weight_path_boundary)
     predictor = partial(boundary_predict_adapter, model = boundary_model)
 
+    do_trim = True
+    do_filter = False
+    do_refine = True
+
     boundary_mask_path = os.path.join(save_path_folder, "raw_boundary.tif")
     predict_windows(pathTif = image_path, pathSave = boundary_mask_path, predictor = predictor, preprocess = preprocess,
-                    window_size = 512, input_dim = input_dim, predict_dim = predict_dim,
+                    window_size = 480, input_dim = input_dim, predict_dim = predict_dim,
                     output_type = "float32", batch_size = batch_size)
 
 
     ### get farm mask
+    if do_filter:
+        args = Configs.model_get_args()
+        farm_model = U2Net(**args)
+        farm_model.load_weights(weight_path_farm)
+        predictor = partial(farm_predict_adapter, model = farm_model)
 
-    args = Configs.model_get_args()
-    farm_model = U2Net(**args)
-    farm_model.load_weights(weight_path_farm)
-    predictor = partial(farm_predict_adapter, model = farm_model)
-
-    farm_mask_path = os.path.join(save_path_folder, "raw_farm.tif")
-    predict_windows(pathTif = image_path, pathSave = farm_mask_path, predictor = predictor, preprocess = preprocess,
-                    window_size = 512, input_dim = input_dim, predict_dim = predict_dim,
-                    output_type = "float32", batch_size = batch_size)
+        farm_mask_path = os.path.join(save_path_folder, "raw_farm.tif")
+        predict_windows(pathTif = image_path, pathSave = farm_mask_path, predictor = predictor, preprocess = preprocess,
+                        window_size = 448, input_dim = input_dim, predict_dim = predict_dim,
+                        output_type = "float32", batch_size = batch_size)
     
-    boundary_binary_mask_path = os.path.join(save_path_folder, "binary_boundary.tif")
+    last = boundary_binary_mask_path = os.path.join(save_path_folder, "binary_boundary.tif")
     to_binary_mask(path_in = boundary_mask_path, path_out=boundary_binary_mask_path, threshold=boundary_threshold)
+    if do_trim:
+        boundary_binary_mask_trimmed_path = os.path.join(save_path_folder, "binary_trimmed_boundary.tif")
+        trim_paths_window(boundary_binary_mask_path, boundary_binary_mask_path)
+        last = boundary_binary_mask_trimmed_path
 
     boundary_shape_path =  os.path.join(save_path_folder, "shape_boundary.shp")
-    vectorize(path_in = boundary_binary_mask_path, path_out = boundary_shape_path)
-    
-    gdf = filter_polygons(boundary_shape_path, farm_mask_path)
-    gdf = simplify_polygons(gdf)
+    vectorize(path_in = last, path_out = boundary_shape_path)
+    if do_filter:
+        gdf = filter_polygons(boundary_shape_path, farm_mask_path)
 
-    result_path = os.path.join(save_path_folder, "final_prediction.tif")
-    refine_polygons(gdf, save_path = result_path)
+    last = boundary_simplified_path = os.path.join(save_path_folder, "shape_boundary_simplified.shp")
+    gdf = simplify_polygons(gdf)
+    gdf.to_file(boundary_simplified_path)
+
+    if do_refine:
+        last = refined_path = os.path.join(save_path_folder, "refined_prediction.shp")
+        refine_polygons(gdf, save_path = refined_path)
+    
+    result_path = os.path.join(save_path_folder, "shape_boundary_results.shp")
+    gdf = gd.read_file(last)
+    gdf.to_file(result_path)
+
+
 
 
 if __name__ == "__main__":
