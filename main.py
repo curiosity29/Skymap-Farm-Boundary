@@ -128,13 +128,14 @@ def predict(image_path = "./image.tif", save_path_folder = "./Predictions",
     last = boundary_simplified_path
     
     if do_buffer:
-        buffered_boundary_path = "shape_boundary_buffered.shp"
+        buffered_boundary_path = os.path.join(save_path_folder, "shape_boundary_buffered.shp")
         if not os.path.exists(buffered_boundary_path):
+            # print("\n buffering \n ")
             refine_buffer(path_in = last, path_out = buffered_boundary_path, distance = 3)
         last = buffered_boundary_path
 
     if do_refine:
-        refined_path = os.path.join(save_path_folder, "refined_prediction.shp")
+        refined_path = os.path.join(save_path_folder, "shape_refined_boundary.shp")
         if not os.path.exists(refined_path):
             refine_polygons(path_in = last, path_out = refined_path)
         last = refined_path

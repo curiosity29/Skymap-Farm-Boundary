@@ -258,6 +258,7 @@ def refine_polygons(path_in, path_out = None):
     if geom is None:
         row_remove_list.append(idx)
         continue
+
     if geom.geom_type == "MultiPolygon":
       # print(geom)
       geoms = list(geom.geoms)
@@ -270,14 +271,16 @@ def refine_polygons(path_in, path_out = None):
       polygon = geometry.MultiPolygon(polygons)
 
 
-    else:
+    elif geom.geom_type == "Polygon":
 
       # if geom.area < eps:
       #   row_remove_list.append(idx)
       #   continue
 
       polygon = refine_polygon(geom)
-
+    else:
+        row_remove_list.append(idx)
+        continue
 
     row["geometry"] = polygon
 
@@ -290,16 +293,16 @@ def refine_polygons(path_in, path_out = None):
   else:
     refined_gdf.to_file(path_out)
 
-def refine_closing(path_in, path_out):
+def refine_closing(path_in, path_out, size = 7):
     with rs.open(path_in) as src:
         out_meta = src.meta
         image = src.read()
         image = np.transpose(image, (1, 2, 0))
-    image = cv2.morphologyEx(image, cv2.MORPH_CLOSE, kernel = np.ones((3,3)))
+    image = cv2.morphologyEx(image, cv2.MORPH_CLOSE, kernel = np.ones((size,size)))
     with rs.open(path_out, "w", **out_meta) as dest:
         dest.write(image[np.newaxis, ...])
     
-def refine_buffer(path_in, path_out, distance = 3.):
+def refine_buffer(path_in, path_out, distance = 1.):
 
     gdf = gd.read_file(path_in)
 
@@ -310,15 +313,15 @@ def refine_buffer(path_in, path_out, distance = 3.):
             geoms = list(geom.geoms)
             polygons = []
             for geom in geoms:
-                geom = buffer(geom, distance)
-                geom = buffer(geom, -distance)
+                geom = buffer(geom, distance = -distance)
+                geom = buffer(geom, distance = distance)
                 polygons.append(geom)
             polygon = geometry.MultiPolygon(polygons)
 
         else:
     
-            polygon = buffer(geom, distance)
-            polygon = buffer(geom, -distance)
+            polygon = buffer(geom, distance = -distance)
+            polygon = buffer(polygon, distance= distance)
 
         row["geometry"] = polygon
         
