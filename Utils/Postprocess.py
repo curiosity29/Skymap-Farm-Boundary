@@ -38,7 +38,7 @@ def to_binary_mask(path_in, path_out, threshold = 0.5):
     dest.write(bin_mask)
 
 ## simplify polygon:
-def filter_polygons(pathShape, pathMask):
+def filter_polygons(pathShape, pathSave, pathMask):
 
   stats = zonal_stats(pathShape, pathMask,
             # stats="count min mean max median")
@@ -54,13 +54,15 @@ def filter_polygons(pathShape, pathMask):
   len(remove_list)
   
   gdf_filtered = gdf_filtered.drop(remove_list)
-  return gdf_filtered
+  gdf_filtered.to_file(pathSave)
+  # return gdf_filtered
 
 # gdf.drop(remove_list)
   
 ## simplify polygon:
-def simplify_polygons(gdf):
-  simplified_gdf = gdf.copy()
+def simplify_polygons(path_in, path_out):
+  simplified_gdf = gd.read_file(path_in)
+  # simplified_gdf = gdf.copy()
   # remove_list = []
   for idx, row in gdf.iterrows():
     geom = row["geometry"]
@@ -73,7 +75,8 @@ def simplify_polygons(gdf):
     row["geometry"] = simple_geom
     # print(row["geometry"])
     simplified_gdf.loc[idx] = row
-  
+
+  simplified_gdf.to_file(path_out)
   return simplified_gdf
 
 

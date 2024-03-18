@@ -83,23 +83,25 @@ def predict(image_path = "./image.tif", save_path_folder = "./Predictions",
 
     boundary_shape_path =  os.path.join(save_path_folder, "shape_boundary.shp")
     vectorize(path_in = last, path_out = boundary_shape_path)
-    if do_filter:
-        gdf = filter_polygons(boundary_shape_path, farm_mask_path)
+    last = boundary_shape_path
 
-    last = boundary_simplified_path = os.path.join(save_path_folder, "shape_boundary_simplified.shp")
-    gdf = simplify_polygons(gdf)
-    gdf.to_file(boundary_simplified_path)
+    if do_filter:
+        boundary_filtered_shape_path = os.path.join(save_path_folder, "shape_boundary_filtered.shp")
+        gdf = filter_polygons(boundary_shape_path, boundary_filtered_shape_path, farm_mask_path)
+        last = boundary_filtered_shape_path
+
+    boundary_simplified_path = os.path.join(save_path_folder, "shape_boundary_simplified.shp")
+    simplify_polygons(path_in = last, path_out=boundary_simplified_path)
+    last = boundary_simplified_path
 
     if do_refine:
-        last = refined_path = os.path.join(save_path_folder, "refined_prediction.shp")
+        refined_path = os.path.join(save_path_folder, "refined_prediction.shp")
         refine_polygons(gdf, save_path = refined_path)
+        last = refined_path
     
     result_path = os.path.join(save_path_folder, "shape_boundary_results.shp")
     gdf = gd.read_file(last)
     gdf.to_file(result_path)
-
-
-
 
 if __name__ == "__main__":
     main_args = get_main_args()
