@@ -10,43 +10,79 @@ class WindowExtractor():
     self.window_shape = window_shape
     self.index = 0
     self.step_divide = step_divide
-    self.n_col = (image_shape[0] // window_shape[0] - 1) * step_divide + 2 # + 2 at start and finish
-    self.n_row = (image_shape[1] // window_shape[1] - 1) * step_divide + 2 # + 2 at start and finish
+    self.n_row = (image_shape[0] - window_shape[0])  // (window_shape[0] // step_divide) + 2 # + 2 at start and finish
+    self.n_col = (image_shape[1] - window_shape[0]) // (window_shape[1] // step_divide) + 2 # + 2 at start and finish
+    self.row = 0
+    self.col = 0
+    self.total = self.getTotal()
 
   def getTotal(self):
     return int(self.n_col * self.n_row)
 
-  def getWindow(self):
+  def getRowCol(self, index):
+    return self.index // self.n_col, self.index % self.n_col
+
+  def next(self):
+    self.row, self.col = self.getRowCol(self.index)
+    self.index += 1
+    if self.index > self.total:
+      return (None, None), (None, None)
+    return self.getWindow(self.row, self.col)
+
+  def toRowCol(self, corX, corY):
+    """
+      get row and col index from pixel coordinate this does account for the last image in each row
+    """
+    row = corX // (self.window_shape[0] // self.step_divide)
+    col = corY // (self.window_shape[0] // self.step_divide)
+    # corX = row * self.window_shape[0] // self.step_divide
+    # corY = col * self.window_shape[0] // self.step_divide
+    return row, col
+  def getWindow(self, row, col):
     """
     return top left coordinate and corner type: None, (0, 0), (0,1), ...
+    -1: not corner
+    0: first (left or top)
+    1: last (right or bottem)
     """
     corner_type = [-1, -1]
-    if self.index >= (self.n_col) * self.n_row:
-      return (None, None), (None, None)
+    # print("col: ", col, self.n_col)
+    # if col == self.n_col:
+    #   print("none")
+    #   return (None, None), (None, None)
 
-    corX, corY = 0, 0
-    posY, posX = self.index // self.n_col, self.index % self.n_col
-    if posX == self.n_col-1:
+    # print(row, col)
+    # corX, corY = 0, 0
+    # posY, posX = self.index // self.n_col, self.index % self.n_col
+    if row == self.n_row-1:
       corner_type[1] = 1
       corX = self.image_shape[0] - self.window_shape[0]
     else:
-      corX = posX * self.window_shape[0] // self.step_divide
-    if posY == self.n_row-1:
+      corX = row * self.window_shape[0] // self.step_divide
+
+    if col == self.n_col-1:
       corner_type[0] = 1
       corY = self.image_shape[1] - self.window_shape[1]
     else:
-      corY = posY * self.window_shape[0] // self.step_divide
+      corY = col * self.window_shape[1] // self.step_divide
 
-    if posY == 0:
-      corner_type[1] = 0
-    if posX == 0:
+    if row == 0:
       corner_type[0] = 0
+    if col == 0:
+      corner_type[1] = 0
 
-    self.index += 1
     return (corX, corY), corner_type
 
+# windowExtractor = WindowExtractor(image_shape = (5000, 5000), window_shape = (512, 512), step_divide = 1)
+# for _ in range(110):
+#   window = windowExtractor.next()
+#   print(window)
+#   # print(window[0])
+#   if window[0][0] is None:
+#     break
 
-def predict_windows(pathTif, pathSave, predictor, preprocess, window_size = 512, input_dim = 3, predict_dim = 1, output_type = "float32", batch_size = 4):
+
+def predict_windows(pathTif, pathSave, predictor, preprocess, window_size = 512, input_dim = 3, predict_dim = 1, output_type = "int8", batch_size = 4):
 
   with rs.open(pathTif) as src:
     # get meta
@@ -57,7 +93,7 @@ def predict_windows(pathTif, pathSave, predictor, preprocess, window_size = 512,
     out_meta.update({"driver": "GTiff",
               "count": predict_dim, "dtype": output_type})
 
-    ##### ONLY TESTED FOR step_divide = 2 or 1
+    #####   CURRENTLY ONLY WORK FOR step_divide = 2
     step_divide = 2
     image_W, image_H = out_meta["width"], out_meta["height"]
     extractor = WindowExtractor(image_shape=(image_W, image_H), window_shape = (window_size, window_size), step_divide = 2)
@@ -69,7 +105,7 @@ def predict_windows(pathTif, pathSave, predictor, preprocess, window_size = 512,
         batch = []
         windows = []
         for _ in range(batch_size):
-          (corX, corY), corner_type = extractor.getWindow()
+          (corX, corY), corner_type = extractor.next()
           # print(corX, corY, corner_type)
           if corX is None:
             break
@@ -99,4 +135,3 @@ def predict_windows(pathTif, pathSave, predictor, preprocess, window_size = 512,
 
         pogbar.update(1)
       pogbar.close()
-

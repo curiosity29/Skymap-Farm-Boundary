@@ -2,13 +2,15 @@ import numpy as np
 
 import tensorflow as tf
 import shapely.geometry as geometry
-from shapely import Polygon
+from shapely import Polygon, buffer
 from rasterstats import zonal_stats
 import geopandas as gd
 import rasterio as rs
 import cv2
 from skimage.morphology import skeletonize #, remove_small_holes, remove_small_objects
-from Window import predict_windows
+from .Window import predict_windows
+import shapely as sl
+
    
 def farm_predict_adapter(batch, model):
   ## dilated predict
@@ -29,14 +31,23 @@ def boundary_predict_adapter(batch, model):
   return pred
 
 
-def to_binary_mask(path_in, path_out, threshold = 0.5):
+def to_binary_mask(path_in, path_out, threshold = 0.5, invert = False):
   with rs.open(path_in) as src:
     out_meta = src.meta
     bin_mask = src.read()
     bin_mask = np.where(bin_mask > threshold, 1., 0.)
   with rs.open(path_out, "w", **out_meta) as dest:
-    dest.write(bin_mask)
+    if invert:
+        dest.write(1- bin_mask)
+    else:
+        dest.write(bin_mask)
 
+def invert_mask(path_in, path_out):
+    with rs.open(path_in) as src:
+        out_meta = src.meta
+        mask = 1 - src.read()
+    with rs.open(path_out, "w", **out_meta) as dest:
+        dest.write(mask)
 ## simplify polygon:
 def filter_polygons(pathShape, pathSave, pathMask):
 
@@ -66,8 +77,13 @@ def simplify_polygons(path_in, path_out):
   # remove_list = []
   for idx, row in simplified_gdf.iterrows():
     geom = row["geometry"]
-    area = geom.area
-    tolerance = min(1., np.sqrt(area) /4)
+    # area = geom.area
+    envelop = sl.minimum_rotated_rectangle(geom)
+    area = envelop.area
+    length = envelop.length
+    side_length = area/ length
+    tolerance = min(4, side_length * 0.3)
+    # tolerance = min(1., np.sqrt(area) /4)
     simple_geom = geom.simplify(tolerance, preserve_topology=False)
     # if simple_geom.area < eps:
     #   remove_list.append(idx)
@@ -77,7 +93,7 @@ def simplify_polygons(path_in, path_out):
     simplified_gdf.loc[idx] = row
 
   simplified_gdf.to_file(path_out)
-  return simplified_gdf
+  # return simplified_gdf
 
 
 def get_angle(pt0, pt1, pt2):
@@ -108,6 +124,7 @@ def get_angle(pt0, pt1, pt2):
 
 
 def checkAngle(concave_set, coords, threshold = 30):
+  coords = np.array(coords)
   n = len(concave_set)
   start = concave_set[0]
   end = concave_set[n-1]
@@ -125,15 +142,18 @@ def checkAngle(concave_set, coords, threshold = 30):
   for idx0 in concave_set:
 
     pt0, pt1, pt2 = coords[idx0], coords[idx1], coords[idx2]
-    angle = get_angle(pt0, pt1, pt2)
+    angle1 = get_angle(pt0, pt1, pt2)
+    pt0, pt1, pt2 = coords[idx0], coords[idx0-1], coords[(idx0+1)%n]
+    angle2 = get_angle(pt0, pt1, pt2)
     # return angle
 
-    if angle < threshold:
+    if min(angle1, angle2) < threshold:
       sharp_indexs.append(idx0)
 
   return sharp_indexs
 
-def refine_polygon(geom):
+
+def refine_polygon(geom, show_fix = False):
   """
   connect slender path (currently not implemented):
         get distance to extended cut
@@ -161,9 +181,16 @@ def refine_polygon(geom):
         if current_concave:
           current_set.append(idx)
         else:
+          current_concave = True
+          current_set = [idx]
+      else:
+        if len(current_set) > 0:
+
+          # plt.imshow()
+
           concave_sets.append(current_set)
           current_concave = False
-          
+
   sharp_indexs = []
   for set_ in concave_sets:
     remove_indexs = checkAngle(set_, geom_coords)
@@ -178,7 +205,26 @@ def refine_polygon(geom):
 
   polygon = Polygon(keep_coords)
 
+  if show_fix:
+    if len(keep_coords) != len(geom_coords):
+    # if True:
+      x, y = geom.exterior.xy
+      plt.subplot(131)
+      plt.plot(x, y)
+      plt.axis("off")
+      x, y = polygon.exterior.xy
+      plt.subplot(132)
+      plt.axis("off")
+      plt.plot(x, y)
+      plt.subplot(133)
+      plt.axis("off")
+      x, y = geom.convex_hull.exterior.xy
+      plt.plot(x, y)
+      plt.show()
 
+
+
+  return polygon
 
 
 
@@ -196,17 +242,22 @@ def refine_polygon(geom):
 
   return polygon
 
-def refine_polygons(gdf, save_path = None):
+def refine_polygons(path_in, path_out = None):
   """
     save path = None mean no saving and return result
   """
+  gdf = gd.read_file(path_in)
   refined_gdf = gdf.copy()
   row_remove_list = []
+
   for idx, row in gdf.iterrows():
 
     # eps = 0.1
     geom = row["geometry"]
-
+      
+    if geom is None:
+        row_remove_list.append(idx)
+        continue
     if geom.geom_type == "MultiPolygon":
       # print(geom)
       geoms = list(geom.geoms)
@@ -233,30 +284,74 @@ def refine_polygons(gdf, save_path = None):
     refined_gdf.loc[idx] = row
 
   refined_gdf = refined_gdf.drop(row_remove_list)
-  if save_path is None:
+  if path_out is None:
     return refined_gdf
 
   else:
-    refined_gdf.to_file(save_path)
+    refined_gdf.to_file(path_out)
+
+def refine_closing(path_in, path_out):
+    with rs.open(path_in) as src:
+        out_meta = src.meta
+        image = src.read()
+        image = np.transpose(image, (1, 2, 0))
+    image = cv2.morphologyEx(image, cv2.MORPH_CLOSE, kernel = np.ones((3,3)))
+    with rs.open(path_out, "w", **out_meta) as dest:
+        dest.write(image[np.newaxis, ...])
+    
+def refine_buffer(path_in, path_out, distance = 3.):
+
+    gdf = gd.read_file(path_in)
+
+    for idx, row in gdf.iterrows():
+        geom = row["geometry"]
+        if geom.geom_type == "MultiPolygon":
+          # print(geom)
+            geoms = list(geom.geoms)
+            polygons = []
+            for geom in geoms:
+                geom = buffer(geom, distance)
+                geom = buffer(geom, -distance)
+                polygons.append(geom)
+            polygon = geometry.MultiPolygon(polygons)
+
+        else:
+    
+            polygon = buffer(geom, distance)
+            polygon = buffer(geom, -distance)
+
+        row["geometry"] = polygon
+        
+        gdf.loc[idx] = row
+    gdf.to_file(path_out)
+    
+def trim_paths(mask, padding = 20, threshold = 0.5, repeat = 5):
+    for _ in range(repeat):
+        bin_mask = np.where(mask > threshold, 1., 0.)
+        padding = 20
+        skeleton = skeletonize(bin_mask).astype(bool).astype(np.uint8)
+        untrimmed = skeleton[padding:-padding, padding:-padding, 0]
+        untrimmed = np.pad(untrimmed, padding, mode='constant', constant_values=1)
+        trimmed = untrimmed
+        # plotN(untrimmed, trimmed, n_row = 1)
+        for _ in range(100):
+            trimmed = cv2.filter2D(trimmed.astype(np.uint8), -1, kernel = np.ones((3,3))) * trimmed
+            trimmed = np.where(trimmed < 3, 0, 1)
+        # print(trimmed.shape)
+        # np.unique(skeleton_type)
+        
+        dif = np.where(untrimmed > trimmed, 1, 0)
+        dil_dif = cv2.dilate(dif.astype(np.uint8), np.ones((3,3)), iterations = 1)
+        mask = np.where(dil_dif > 0, 0, mask[..., 0])[..., np.newaxis]
+        # plt.show()
+
+  # mask[padding:-padding, padding:-padding] = trimmed[padding:-padding, padding:-padding, np.newaxis]
+
+    return mask
 
 
-def trim_paths(mask, padding = 20):
-  padding = 20
-  skeleton = skeletonize(mask)
-  trimmed = skeleton[padding:-padding, padding:-padding, 0]
-  trimmed = np.pad(trimmed, padding, mode='constant', constant_values=1)
-  for _ in range(100):
-    trimmed = cv2.filter2D(trimmed.astype(np.uint8), -1, kernel = np.ones((3,3))) * trimmed
-    trimmed = np.where(trimmed < 3, 0, 1)
-    # print(trimmed.shape)
-    # np.unique(skeleton_type)
-
-  mask[padding:-padding, padding:-padding] = trimmed
-
-  return mask
-
-def trim_paths_window(path_in, path_out):
-  predictor = lambda batch: np.array([trim_paths(x, padding = 20) for x in batch])
+def trim_paths_window(path_in, path_out, threshold = 0.5):
+  predictor = lambda batch: np.array([trim_paths(x, padding = 20, threshold = threshold, repeat = 5) for x in batch])
   preprocess = lambda x: x
   
   predict_windows(pathTif = path_in, pathSave = path_out, predictor = predictor, preprocess = preprocess,
