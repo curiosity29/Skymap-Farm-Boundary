@@ -153,7 +153,7 @@ def checkAngle(concave_set, coords, threshold = 30):
   return sharp_indexs
 
 
-def refine_polygon(geom, show_fix = False):
+def refine_polygon(geom):
   """
   connect slender path (currently not implemented):
         get distance to extended cut
@@ -204,25 +204,6 @@ def refine_polygon(geom, show_fix = False):
       keep_coords.append(coord)
 
   polygon = Polygon(keep_coords)
-
-  if show_fix:
-    if len(keep_coords) != len(geom_coords):
-    # if True:
-      x, y = geom.exterior.xy
-      plt.subplot(131)
-      plt.plot(x, y)
-      plt.axis("off")
-      x, y = polygon.exterior.xy
-      plt.subplot(132)
-      plt.axis("off")
-      plt.plot(x, y)
-      plt.subplot(133)
-      plt.axis("off")
-      x, y = geom.convex_hull.exterior.xy
-      plt.plot(x, y)
-      plt.show()
-
-
 
   return polygon
 
