@@ -64,7 +64,7 @@ def simplify_polygons(path_in, path_out):
   simplified_gdf = gd.read_file(path_in)
   # simplified_gdf = gdf.copy()
   # remove_list = []
-  for idx, row in gdf.iterrows():
+  for idx, row in simplified_gdf.iterrows():
     geom = row["geometry"]
     area = geom.area
     tolerance = min(1., np.sqrt(area) /4)
