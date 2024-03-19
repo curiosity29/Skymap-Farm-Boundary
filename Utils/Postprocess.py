@@ -232,7 +232,7 @@ def refine_polygons(path_in, path_out = None):
   row_remove_list = []
 
   for idx, row in gdf.iterrows():
-
+    maximum_area = 100 * 1000. # 100,000 m^2
     # eps = 0.1
     geom = row["geometry"]
       
@@ -245,18 +245,21 @@ def refine_polygons(path_in, path_out = None):
       geoms = list(geom.geoms)
       polygons = []
       for geom in geoms:
-        # if geom.area < eps:
-        #     row_remove_list.append(idx)
-        #     continue
+
+        if geom.area > maximum_area:
+          row_remove_list.append(idx)
+          break
+
         polygons.append(refine_polygon(geom))
       polygon = geometry.MultiPolygon(polygons)
 
 
     elif geom.geom_type == "Polygon":
 
-      # if geom.area < eps:
-      #   row_remove_list.append(idx)
-      #   continue
+
+      if geom.area > maximum_area:
+        row_remove_list.append(idx)
+        continue
 
       polygon = refine_polygon(geom)
     else:
