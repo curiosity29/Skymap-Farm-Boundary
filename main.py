@@ -4,8 +4,9 @@ from functools import partial
 import os, sys, glob
 
 from Utils.Window import predict_windows
+from Utils.WindowKernel import predict_windows_kernel
 from Utils.Vectorize import vectorize
-from Utils.Postprocess import farm_predict_adapter, boundary_predict_adapter, refine_buffer, refine_closing,\
+from Utils.Postprocess import farm_predict_adapter, boundary_predict_adapter, refine_buffer, refine_opening,\
     filter_polygons, simplify_polygons, refine_polygons, to_binary_mask, trim_paths_window, invert_mask
 from Utils.changeCrs import change_crs
 from Model import U2Net
@@ -19,7 +20,7 @@ def get_main_args():
     arg("--weight_path_boundary", type=str, default="./Checkpoints/Boundary/*.h5", help="checkpoint file to create boundary mask")
     arg("--weight_path_farm", type=str, default="./Checkpoints/Farm/*.h5", help="checkpoint file to create farm mask")
 
-    arg("--image_path", type=str, default="./Images/*.tif", help="4 channel input tif file")
+    arg("--image_path", type=str, default="./Images/cha*.tif", help="4 channel input tif file")
     arg("--save_path_folder", type=str, default="./Predictions/", help="folder to save prediction and other processing file")
     arg("--batch_size", type=int, default=1, help="batch size each predict, lowering to reduce memory requirement")
     arg("--boundary_threshold", type=float, default=0.4, help="threshold to create boundary mask from prediction")
@@ -39,7 +40,7 @@ def predict(image_path = "./image.tif", save_path_folder = "./Predictions",
     do_refine = True
     do_change_crs = True
     do_buffer = True
-    do_closing = True
+    do_opening= True
     
     
     if search_path:
@@ -65,10 +66,14 @@ def predict(image_path = "./image.tif", save_path_folder = "./Predictions",
 
 
     boundary_mask_path = os.path.join(save_path_folder, "raw_boundary.tif")
+    # if True: 
     if not os.path.exists(boundary_mask_path):
-        predict_windows(pathTif = image_path, pathSave = boundary_mask_path, predictor = predictor, preprocess = preprocess,
-                    window_size = 480, input_dim = input_dim, predict_dim = predict_dim,
-                    output_type = "float32", batch_size = batch_size)
+        # predict_windows(pathTif = image_path, pathSave = boundary_mask_path, predictor = predictor, preprocess = preprocess,
+        #             window_size = 480, input_dim = input_dim, predict_dim = predict_dim,
+        #             output_type = "float32", batch_size = batch_size)
+        predict_windows_kernel(pathTif = image_path, pathSave = boundary_mask_path, predictor = predictor, preprocess = preprocess,
+            window_size = 480, input_dim = input_dim, predict_dim = predict_dim,
+            output_type = "float32", batch_size = batch_size)
 
     
     ### get farm mask
@@ -99,11 +104,11 @@ def predict(image_path = "./image.tif", save_path_folder = "./Predictions",
         invert_mask(path_in = last, path_out = boundary_inverted_path)
     last = boundary_inverted_path
 
-    if do_closing:
-        boundary_closing_path = os.path.join(save_path_folder, "boundary_closing.tif")
-        if not os.path.exists(boundary_closing_path):
-            refine_closing(path_in = last, path_out = boundary_closing_path)
-        last = boundary_closing_path
+    if do_opening:
+        boundary_opening_path = os.path.join(save_path_folder, "boundary_opening.tif")
+        if not os.path.exists(boundary_opening_path):
+            refine_opening(path_in = last, path_out = boundary_opening_path)
+        last = boundary_opening_path
 
     boundary_shape_path =  os.path.join(save_path_folder, "shape_boundary.shp")
     if not os.path.exists(boundary_shape_path):
@@ -131,7 +136,7 @@ def predict(image_path = "./image.tif", save_path_folder = "./Predictions",
         buffered_boundary_path = os.path.join(save_path_folder, "shape_boundary_buffered.shp")
         if not os.path.exists(buffered_boundary_path):
             # print("\n buffering \n ")
-            refine_buffer(path_in = last, path_out = buffered_boundary_path, distance = 3)
+            refine_buffer(path_in = last, path_out = buffered_boundary_path, distance = 1)
         last = buffered_boundary_path
 
     if do_refine:
