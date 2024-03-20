@@ -96,7 +96,7 @@ def predict(image_path = "./image.tif", save_path_folder = "./Predictions",
     if do_trim:
         boundary_binary_mask_trimmed_path = os.path.join(save_path_folder, "binary_trimmed_boundary.tif")
         if not os.path.exists(boundary_binary_mask_trimmed_path):
-            trim_paths_window(boundary_binary_mask_path, boundary_binary_mask_trimmed_path, length = 100, repeat = 5, use_gpu = False)
+            trim_paths_window(boundary_binary_mask_path, boundary_binary_mask_trimmed_path, length = 100, repeat = 5, use_gpu = use_cupy)
         last = boundary_binary_mask_trimmed_path
 
         
