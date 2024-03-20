@@ -31,7 +31,7 @@ def create_list_shp(shapedir):
                 list_shp.append(os.path.join(shapedir,dir_name, file_name))
     return list_shp
 
-def caculator_area(input_path, bound_path = None, output_path = None):
+def change_crs(input_path, bound_path = None, output_path = None):
     # input_path = r"/mnt/g/farm/Result_QC/MH_FandV/MH_FandV.shp"
     # output_path = r"/mnt/g/farm/Result_QC/MH_FandV/MH_FandV_utm.shp"
     # bound_path = r"/mnt/g/farm/MH_FandV.geojson"

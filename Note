@@ -1,3 +1,5 @@
+Each middle process is not rerun and will skip over, using the old file if the file name is presented in the save folder.
+
 Trim path using gpu is tested with google colab on 20/3/2024:
 
 Python==3.10.12
