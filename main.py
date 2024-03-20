@@ -27,12 +27,13 @@ def get_main_args():
     arg("--farm_threshold", type=float, default=0.4, help="threshold to filter out non-farm polygon from vectorized predicton")
     arg("--simplify_distance", type=float, default=1.0, help="tolerance to simplify farm boundary polygon")
     arg("--sharp_angle", type=float, default=30, help="minimum accepted angle (in degree) to exists inside polygon's convex hull, correspongding vertex is removed otherwise")
+    arg("--use_cupy", type=bool, default=True, help="using cupy to run gpu on the process of filtering out incomple paths or using normal cpu")
     return parser.parse_args()
 
 
 def predict(image_path = "./image.tif", save_path_folder = "./Predictions", 
             weight_path_boundary = "./Checkpoint_weights/*.weights.h5", weight_path_farm = "./Checkpoint_weights/*.weights.h5",
-            batch_size = 1, simplify_distance = 1., boundary_threshold = 0.5, farm_threshold = 0.5, sharp_angle = 30,
+            batch_size = 1, simplify_distance = 1., boundary_threshold = 0.5, farm_threshold = 0.5, sharp_angle = 30, use_cupy = True,
             search_path = True):
 
     do_trim = True
@@ -135,7 +136,6 @@ def predict(image_path = "./image.tif", save_path_folder = "./Predictions",
     if do_buffer:
         buffered_boundary_path = os.path.join(save_path_folder, "shape_boundary_buffered.shp")
         if not os.path.exists(buffered_boundary_path):
-            # print("\n buffering \n ")
             refine_buffer(path_in = last, path_out = buffered_boundary_path, distance = 1)
         last = buffered_boundary_path
 

@@ -23,6 +23,7 @@ weight_path_farm: checkpoint file to create farm mask (currently not needed by d
 + farm_threshold: threshold to filter out non-farm polygon from vectorized predicton
 + simplify_distance: tolerance to simplify farm boundary polygon (unused parameter, currently auto choosen dynamically for each polygon)
 + sharp_angle: minimum accepted angle (in degree) to exists inside polygon's convex hull, correspongding vertex is removed otherwise
++ use_cupy: using cupy to run gpu on the process of filtering out incomple paths or using normal cpu
 
 Outline:
 

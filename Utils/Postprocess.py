@@ -10,9 +10,7 @@ import cv2
 from skimage.morphology import skeletonize #, remove_small_holes, remove_small_objects
 from .Window import predict_windows
 import shapely as sl
-import cupy as cp
-from cupyx.scipy.ndimage import grey_opening, grey_dilation
-from cupyx.scipy.signal import convolve2d as convolve2d_gpu
+
    
 def farm_predict_adapter(batch, model):
   ## dilated predict
@@ -475,6 +473,9 @@ def trim_paths_window(path_in, path_out, length = 100, repeat = 5, use_gpu = Tru
         None
   """
   if use_gpu:
+    import cupy as cp
+    from cupyx.scipy.ndimage import grey_opening, grey_dilation
+    from cupyx.scipy.signal import convolve2d as convolve2d_gpu
     predictor = lambda batch: np.array([trim_paths_gpu(x, padding = 20, repeat = repeat, length= length) for x in batch])[..., np.newaxis]
   else:
     predictor = lambda batch: np.array([trim_paths(x, padding = 20, repeat = repeat, length = length) for x in batch])[..., np.newaxis]
