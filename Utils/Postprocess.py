@@ -371,7 +371,7 @@ def refine_buffer(path_in, path_out, distance = 1.):
     gdf.to_file(path_out)
     
     
-def trim_paths(bin_mask, padding = 10, repeat = 5, length = 100):
+def trim_paths(bin_mask, padding = 10, repeat = 5, length = 100, use_opening = False):
   """
     Remove (change pixel to zeros) all the incomplete path in a binary of boundary (paths) mask using repeated skeletonize and removing endpoint
       Args:
@@ -401,7 +401,8 @@ def trim_paths(bin_mask, padding = 10, repeat = 5, length = 100):
       dif = np.where(untrimmed > trimmed, 1, 0)
       dil_dif = cv2.dilate(dif.astype(np.uint8), kernel, iterations = 1)
       bin_mask = np.where(dil_dif > 0, 0, bin_mask)
-      bin_mask = cv2.morphologyEx(bin_mask, cv2.MORPH_OPEN, kernel5)
+      if use_opening:
+        bin_mask = cv2.morphologyEx(bin_mask, cv2.MORPH_OPEN, kernel5)
       # plt.show()
 
 # mask[padding:-padding, padding:-padding] = trimmed[padding:-padding, padding:-padding, np.newaxis]

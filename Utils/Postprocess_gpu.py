@@ -16,7 +16,7 @@ from cupyx.scipy.ndimage import grey_opening, grey_dilation
 from cupyx.scipy.signal import convolve2d as convolve2d_gpu
     
 
-def trim_paths_gpu(bin_mask, padding = 10, repeat = 5, length = 100):
+def trim_paths_gpu(bin_mask, padding = 10, repeat = 5, length = 100, use_opening = False):
   """
     Same as trim_paths but using gpu instead of cpu.
     Remove (change pixel to zeros) all the incomplete path in a binary of boundary (paths) mask using repeated skeletonize and removing endpoint
@@ -60,7 +60,8 @@ def trim_paths_gpu(bin_mask, padding = 10, repeat = 5, length = 100):
       bin_mask_gpu = cp.where(dil_dif > 0, 0, bin_mask_gpu)
       # bin_mask = cv2.morphologyEx(bin_mask_gpu.get(), cv2.MORPH_OPEN, kernel5)
       # bin_mask_gpu = grey_opening(bin_mask_gpu, structure = kernel)
-      bin_mask_gpu = grey_opening(bin_mask_gpu, size = 5)
+      if use_opening:
+        bin_mask_gpu = grey_opening(bin_mask_gpu, size = 5)
       # plt.show()
 # mask[padding:-padding, padding:-padding] = trimmed[padding:-padding, padding:-padding, np.newaxis]
 
