@@ -20,7 +20,7 @@ def get_main_args():
     arg("--weight_path_boundary", type=str, default="./Checkpoints/Boundary/*.h5", help="checkpoint file to create boundary mask")
     arg("--weight_path_farm", type=str, default="./Checkpoints/Farm/*.h5", help="checkpoint file to create farm mask")
 
-    arg("--image_path", type=str, default="./Images/cha*.tif", help="4 channel input tif file")
+    arg("--image_path", type=str, default="./Images/*.tif", help="3 channel (rgb) input tif file")
     arg("--save_path_folder", type=str, default="./Predictions/", help="folder to save prediction and other processing file")
     arg("--batch_size", type=int, default=1, help="batch size each predict, lowering to reduce memory requirement")
     arg("--boundary_threshold", type=float, default=0.4, help="threshold to create boundary mask from prediction")
