@@ -21,7 +21,7 @@ weight_path_farm: checkpoint file to create farm mask (currently not needed by d
 + batch_size: batch size each predict, lowering to reduce memory requirement
 + boundary_threshold: threshold to create binary boundary mask from prediction
 + farm_threshold: threshold to filter out non-farm polygon from vectorized predicton
-+ simplify_distance: tolerance to simplify farm boundary polygon
++ simplify_distance: tolerance to simplify farm boundary polygon (unused parameter, currently auto choosen dynamically for each polygon)
 + sharp_angle: minimum accepted angle (in degree) to exists inside polygon's convex hull, correspongding vertex is removed otherwise
 
 Outline:
