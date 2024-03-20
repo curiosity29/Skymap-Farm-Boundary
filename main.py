@@ -97,7 +97,7 @@ def predict(image_path = "./image.tif", save_path_folder = "./Predictions",
         boundary_binary_mask_trimmed_path = os.path.join(save_path_folder, "binary_trimmed_boundary.tif")
         if not os.path.exists(boundary_binary_mask_trimmed_path):
             if use_cupy:
-                from Utils.Postprocess import trim_paths_window_gpu
+                from Utils.Postprocess_gpu import trim_paths_window_gpu
                 trim_paths_window_gpu(boundary_binary_mask_path, boundary_binary_mask_trimmed_path, length = 100, repeat = 5)
             else:
                 trim_paths_window(boundary_binary_mask_path, boundary_binary_mask_trimmed_path, length = 100, repeat = 5)
