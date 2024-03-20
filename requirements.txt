@@ -6,3 +6,4 @@ shapely
 geopandas
 opencv
 scikit-image
+cupy

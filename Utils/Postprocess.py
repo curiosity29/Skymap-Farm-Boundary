@@ -10,7 +10,9 @@ import cv2
 from skimage.morphology import skeletonize #, remove_small_holes, remove_small_objects
 from .Window import predict_windows
 import shapely as sl
-
+import cupy as cp
+from cupyx.scipy.ndimage import grey_opening, grey_dilation
+from cupyx.scipy.signal import convolve2d as convolve2d_gpu
    
 def farm_predict_adapter(batch, model):
   ## dilated predict
@@ -312,33 +314,87 @@ def refine_buffer(path_in, path_out, distance = 1.):
         gdf.loc[idx] = row
     gdf.to_file(path_out)
     
-def trim_paths(mask, padding = 20, threshold = 0.5, repeat = 5):
-    for _ in range(repeat):
-        bin_mask = np.where(mask > threshold, 1., 0.)
-        padding = 20
-        skeleton = skeletonize(bin_mask).astype(bool).astype(np.uint8)
-        untrimmed = skeleton[padding:-padding, padding:-padding, 0]
-        untrimmed = np.pad(untrimmed, padding, mode='constant', constant_values=1)
-        trimmed = untrimmed
-        # plotN(untrimmed, trimmed, n_row = 1)
-        for _ in range(100):
+    
+def trim_paths(bin_mask, padding = 10, repeat = 5, length = 100):
+  """
+  input: binary mask
+  """
+  if len(bin_mask.shape) > 2:
+    bin_mask = bin_mask[..., 0]
+  kernel = np.ones((3,3)).astype(np.uint8)
+  kernel5 = np.ones((5,5)).astype(np.uint8)
+  for _ in range(repeat):
+      # bin_mask = np.where(mask > threshold, 1., 0.)
+      skeleton = skeletonize(bin_mask).astype(bool).astype(np.uint8)
+      untrimmed = skeleton[padding:-padding, padding:-padding]
+      untrimmed = np.pad(untrimmed, padding, mode='constant', constant_values=1)
+      trimmed = untrimmed.astype(np.uint8)
+      # plotN(untrimmed, trimmed, n_row = 1)
+      for _ in range(length):
             trimmed = cv2.filter2D(trimmed.astype(np.uint8), -1, kernel = np.ones((3,3))) * trimmed
             trimmed = np.where(trimmed < 3, 0, 1)
-        # print(trimmed.shape)
-        # np.unique(skeleton_type)
-        
-        dif = np.where(untrimmed > trimmed, 1, 0)
-        dil_dif = cv2.dilate(dif.astype(np.uint8), np.ones((3,3)), iterations = 1)
-        mask = np.where(dil_dif > 0, 0, mask[..., 0])[..., np.newaxis]
-        # plt.show()
 
-  # mask[padding:-padding, padding:-padding] = trimmed[padding:-padding, padding:-padding, np.newaxis]
+      
+      dif = np.where(untrimmed > trimmed, 1, 0)
+      dil_dif = cv2.dilate(dif.astype(np.uint8), kernel, iterations = 1)
+      bin_mask = np.where(dil_dif > 0, 0, bin_mask)
+      bin_mask = cv2.morphologyEx(bin_mask, cv2.MORPH_OPEN, kernel5)
+      # plt.show()
 
-    return mask
+# mask[padding:-padding, padding:-padding] = trimmed[padding:-padding, padding:-padding, np.newaxis]
+
+  return bin_mask
+
+    
+def trim_paths_gpu(bin_mask, padding = 10, repeat = 5, length = 100):
+  """
+  input: 2 dimensional binary mask
+  """
+  if len(bin_mask.shape) > 2:
+    bin_mask = bin_mask[..., 0]
+  kernel = np.ones((3,3)).astype(np.uint8)
+  kernel5 = np.ones((5,5)).astype(np.uint8)
+  kernel_gpu = cp.asarray(kernel)
+  bin_mask_gpu = cp.asarray(bin_mask)
+  for _ in range(repeat):
+      # bin_mask = np.where(mask > threshold, 1., 0.)
+
+      skeleton = skeletonize(bin_mask_gpu.get()).astype(bool).astype(np.uint8)
+
+      untrimmed = skeleton[padding:-padding, padding:-padding]
+      untrimmed = np.pad(untrimmed, padding, mode='constant', constant_values=1)
+      trimmed = untrimmed.astype(np.uint8)
+
+      untrimmed_gpu = cp.asarray(trimmed)
+      trimmed_gpu=cp.asarray(trimmed)
+      # plotN(untrimmed, trimmed, n_row = 1)
+      for _ in range(length):
+          # trimmed_gpu = convolve2d_gpu(trimmed_gpu, kernel_gpu)[1:-1, 1:-1] * trimmed_gpu
+          # trimmed_gpu = cp.where(trimmed_gpu < 3, 0, 1)
+          trimmed_gpu = cp.where(convolve2d_gpu(trimmed_gpu, kernel_gpu)[1:-1, 1:-1] < 3, 0, trimmed_gpu)
+          # trimmed_gpu = (trimmed_gpu < 3, 0, 1)
+      # print(trimmed.shape)
+      # np.unique(skeleton_type)
+      
+      dif = cp.where(untrimmed_gpu > trimmed_gpu, 1, 0)
+      dil_dif = grey_dilation(dif, size =3)
+      # dil_dif = cv2.dilate(dif.astype(np.uint8), kernel, iterations = 1)
+      bin_mask_gpu = cp.where(dil_dif > 0, 0, bin_mask_gpu)
+      # bin_mask = cv2.morphologyEx(bin_mask_gpu.get(), cv2.MORPH_OPEN, kernel5)
+      # bin_mask_gpu = grey_opening(bin_mask_gpu, structure = kernel)
+      bin_mask_gpu = grey_opening(bin_mask_gpu, size = 5)
+      # plt.show()
+
+# mask[padding:-padding, padding:-padding] = trimmed[padding:-padding, padding:-padding, np.newaxis]
+
+  return bin_mask_gpu.get()
 
 
-def trim_paths_window(path_in, path_out, threshold = 0.5):
-  predictor = lambda batch: np.array([trim_paths(x, padding = 20, threshold = threshold, repeat = 5) for x in batch])
+def trim_paths_window(path_in, path_out, length = 100, repeat = 5, use_gpu = True):
+  if use_gpu:
+    predictor = lambda batch: np.array([trim_paths(x, padding = 20, repeat = repeat, length= length) for x in batch])
+  else:
+    predictor = lambda batch: np.array([trim_paths(x, padding = 20, repeat = repeat, length = length) for x in batch])
   preprocess = lambda x: x
   
   predict_windows(pathTif = path_in, pathSave = path_out, predictor = predictor, preprocess = preprocess,
