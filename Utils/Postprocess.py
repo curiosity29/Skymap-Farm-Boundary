@@ -421,7 +421,7 @@ def trim_paths_window(path_in, path_out, length = 100, repeat = 5):
       Return:
         None
   """
-  predictor = lambda batch: np.array([trim_paths(x, padding = 20, repeat = repeat, length = length) for x in batch])[..., np.newaxis]
+  predictor = lambda batch: np.array([trim_paths(x, padding = 20, repeat = repeat, length = length)[..., np.newaxis] for x in batch])
 
   preprocess = lambda x: x
   
