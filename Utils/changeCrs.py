@@ -35,7 +35,7 @@ def caculator_area(input_path, bound_path = None, output_path = None):
     # input_path = r"/mnt/g/farm/Result_QC/MH_FandV/MH_FandV.shp"
     # output_path = r"/mnt/g/farm/Result_QC/MH_FandV/MH_FandV_utm.shp"
     # bound_path = r"/mnt/g/farm/MH_FandV.geojson"
-    print(output_path)
+    # print(output_path)
     crs = {'init':'epsg:4326'}
     data_shp = gdp.read_file(input_path)
     data_shp_4326 = data_shp.to_crs(crs)
@@ -47,7 +47,7 @@ def caculator_area(input_path, bound_path = None, output_path = None):
       bound_gdf_4326 = bound_gdf.to_crs(crs)
 
       data_shp_4326=gdp.overlay(data_shp_4326, bound_gdf_4326, how='intersection', keep_geom_type=None, make_valid=True)
-      print(data_shp_4326)
+    #   print(data_shp_4326)
       minx, miny, maxx, maxy = (data_shp_4326.total_bounds)
 
     bounds_pgon = geometry.box(minx, miny, maxx, maxy)

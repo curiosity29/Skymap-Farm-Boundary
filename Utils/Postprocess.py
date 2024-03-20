@@ -97,10 +97,7 @@ def filter_polygons(pathShape, pathSave, pathMask, farm_threshold = 0.4):
   
   gdf_filtered = gdf_filtered.drop(remove_list)
   gdf_filtered.to_file(pathSave)
-  # return gdf_filtered
 
-# gdf.drop(remove_list)
-  
 ## simplify polygon:
 def simplify_polygons(path_in, path_out):
   """
@@ -114,8 +111,7 @@ def simplify_polygons(path_in, path_out):
   
   """
   simplified_gdf = gd.read_file(path_in)
-  # simplified_gdf = gdf.copy()
-  # remove_list = []
+
   for idx, row in simplified_gdf.iterrows():
     geom = row["geometry"]
     # area = geom.area
@@ -130,11 +126,11 @@ def simplify_polygons(path_in, path_out):
     #   remove_list.append(idx)
     #   continue
     row["geometry"] = simple_geom
-    # print(row["geometry"])
+
     simplified_gdf.loc[idx] = row
 
   simplified_gdf.to_file(path_out)
-  # return simplified_gdf
+
 
 
 def get_angle(pt0, pt1, pt2):
@@ -260,22 +256,6 @@ def refine_polygon(geom):
       keep_coords.append(coord)
 
   polygon = Polygon(keep_coords)
-
-  return polygon
-
-
-
-  # print(len(sharp_indexs))
-  # if len(keep_coords) != len(geom_coords):
-  #   x, y = geom.exterior.xy
-  #   plt.subplot(121)
-  #   plt.plot(x, y)
-  #   x, y = polygon.exterior.xy
-  #   plt.subplot(122)
-  #   plt.plot(x, y)
-  #   plt.show()
-
-
 
   return polygon
 

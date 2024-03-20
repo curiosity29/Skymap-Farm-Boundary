@@ -47,14 +47,7 @@ class WindowExtractor():
     1: last (right or bottem)
     """
     corner_type = [-1, -1]
-    # print("col: ", col, self.n_col)
-    # if col == self.n_col:
-    #   print("none")
-    #   return (None, None), (None, None)
 
-    # print(row, col)
-    # corX, corY = 0, 0
-    # posY, posX = self.index // self.n_col, self.index % self.n_col
     if row == self.n_row-1:
       corner_type[1] = 1
       corX = self.image_shape[0] - self.window_shape[0]
@@ -74,26 +67,13 @@ class WindowExtractor():
 
     return (corX, corY), corner_type
 
-# windowExtractor = WindowExtractor(image_shape = (5000, 5000), window_shape = (512, 512), step_divide = 1)
-# for _ in range(110):
-#   window = windowExtractor.next()
-#   print(window)
-#   # print(window[0])
-#   if window[0][0] is None:
-#     break
 
 def create_kernel(kernel, image_W, image_H,  window_size = 512, count = 1, step_divide = 1.25, dtype = "uint16"):
     extractor = WindowExtractor(image_shape=(image_W, image_H), window_shape = (window_size, window_size), step_divide = step_divide)
     # create empty kernel
     with rs.open("./kernel.tif", "w", width = image_W, height = image_H, count = count, dtype = dtype) as dest:
         pass
-        # while True:
-        #     (corX, corY), corner_type = extractor.next()
-        #     if corX is None:
-        #         break
-        #     window = rWindow(corX, corY, window_size, window_size)
-        #     dest.write(np.zeros((1, window_size, window_size)), window = window)
-    
+
     # create kernel weight
     extractor = WindowExtractor(image_shape=(image_W, image_H), window_shape = (window_size, window_size), step_divide = step_divide)
     
@@ -181,8 +161,7 @@ def predict_windows(pathTif, pathSave, predictor, preprocess, window_size = 512,
             break
           window = rWindow(corX, corY, window_size, window_size)
           if corner_type == [-1, -1]:
-            # windowWrite = rWindow(
-            #   corX + window_size // 4, corY + window_size // 4, window_size//2, window_size//2)
+
             windows.append([window, True]) # is corner, write full size
           else:
             windows.append([window, False]) # not corner, write center
@@ -198,9 +177,7 @@ def predict_windows(pathTif, pathSave, predictor, preprocess, window_size = 512,
         for predict, window in zip(predicts, windows):
           predict = predict * kernel
           predict = np.transpose(predict, (2,0,1))
-          # if window[1]:
-            # predict = predict [
-            #   :, window_size // 4 : - window_size // 4, window_size // 4: -window_size // 4]
+
           current = dest.read(window = window[0])
           predict = current + predict
           dest.write(predict, window = window[0])

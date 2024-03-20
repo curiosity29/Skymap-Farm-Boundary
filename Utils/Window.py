@@ -35,8 +35,7 @@ class WindowExtractor():
     """
     row = corX // (self.window_shape[0] // self.step_divide)
     col = corY // (self.window_shape[0] // self.step_divide)
-    # corX = row * self.window_shape[0] // self.step_divide
-    # corY = col * self.window_shape[0] // self.step_divide
+
     return row, col
   def getWindow(self, row, col):
     """
@@ -46,14 +45,7 @@ class WindowExtractor():
     1: last (right or bottem)
     """
     corner_type = [-1, -1]
-    # print("col: ", col, self.n_col)
-    # if col == self.n_col:
-    #   print("none")
-    #   return (None, None), (None, None)
 
-    # print(row, col)
-    # corX, corY = 0, 0
-    # posY, posX = self.index // self.n_col, self.index % self.n_col
     if row == self.n_row-1:
       corner_type[1] = 1
       corX = self.image_shape[0] - self.window_shape[0]
@@ -72,14 +64,6 @@ class WindowExtractor():
       corner_type[1] = 0
 
     return (corX, corY), corner_type
-
-# windowExtractor = WindowExtractor(image_shape = (5000, 5000), window_shape = (512, 512), step_divide = 1)
-# for _ in range(110):
-#   window = windowExtractor.next()
-#   print(window)
-#   # print(window[0])
-#   if window[0][0] is None:
-#     break
 
 
 def predict_windows(pathTif, pathSave, predictor, preprocess, window_size = 512, input_dim = 3, predict_dim = 1, output_type = "int8", batch_size = 4):
@@ -106,7 +90,7 @@ def predict_windows(pathTif, pathSave, predictor, preprocess, window_size = 512,
         windows = []
         for _ in range(batch_size):
           (corX, corY), corner_type = extractor.next()
-          # print(corX, corY, corner_type)
+
           if corX is None:
             break
           window = rWindow(corX, corY, window_size, window_size)
