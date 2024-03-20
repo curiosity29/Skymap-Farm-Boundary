@@ -7,3 +7,4 @@ geopandas
 opencv
 scikit-image
 cupy
+scipy
